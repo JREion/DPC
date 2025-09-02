@@ -219,10 +219,11 @@ class ResidualAttentionBlock_IVLP(nn.Module):
                 # Code snippet for per layer visual prompts
                 nn.init.normal_(ctx_vectors, std=0.02)
                 self.VPT_shallow = nn.Parameter(ctx_vectors)
+                # print("===self.VPT_shallow===", self.VPT_shallow.size(), "i=", str(i))
         else:
             self.add_prompt = False
 
-    # [SPLE] Extract VPT_shallow
+    # [SPLE] 提取 VPT_shallow
     def get_ctx_vectors(self, i):
         if i != 0:
             if self.add_prompt:
@@ -346,11 +347,8 @@ class Transformer(nn.Module):
         # Implements respective encoder blocks for a given design choice
         current_trainer = design_details['trainer']
         if current_trainer == 'IVLP' or current_trainer == 'VPT':
-            self.resblocks = nn.Sequential(*[ResidualAttentionBlock_IVLP(width, heads, attn_mask, True,
-                                                                         text_layer, i,
-                                                                         design_details) if prompts_needed > i
-                                             else ResidualAttentionBlock_IVLP(width, heads, attn_mask, False,
-                                                                              text_layer, i, design_details)
+            self.resblocks = nn.Sequential(*[ResidualAttentionBlock_IVLP(width, heads, attn_mask, True, text_layer, i, design_details) if prompts_needed > i
+                                             else ResidualAttentionBlock_IVLP(width, heads, attn_mask, False, text_layer, i, design_details)
                                              for i in range(layers)])
         elif current_trainer == 'MaPLe':
             self.resblocks = nn.Sequential(
@@ -361,7 +359,7 @@ class Transformer(nn.Module):
             assert current_trainer == 'CoOp' or current_trainer == 'CoCoOp'
             self.resblocks = nn.Sequential(*[ResidualAttentionBlock(width, heads, attn_mask) for _ in range(layers)])
 
-        # [SPLE] Get VPT_shallow of each layer in the ResidualAttentionBlock_IVLP, organize it as self.ctx_list list
+        # [SPLE] 获取 ResidualAttentionBlock_IVLP 网络中每一层的 VPT_shallow, 并组织为一个 self.ctx_list 列表\
         if current_trainer == 'IVLP' or current_trainer == 'VPT':
             self.ctx_list = []
             for idx, block in enumerate(self.resblocks):
@@ -375,13 +373,6 @@ class VisionTransformer(nn.Module):
     def __init__(self, input_resolution: int, patch_size: int, width: int, layers: int, heads: int,
                  output_dim: int, design_details):
         super().__init__()
-
-        # [SPLE] Get necessary parameters
-        _, _, self.ctx_vpt, _ = self.load_promptsrc_prompt_vector(design_details)  # [SPLE] Get ctx_vpt
-        self.sple_mode = design_details["sple_mode"]  # [SPLE] Get sple_mode (CONVERSE)
-        self.stack_weight = design_details["stack_weight"]  # [SPLE] Get stack_weight
-        sple_init = design_details["sple_init"]  # [SPLE] Get sple_init
-
         self.input_resolution = input_resolution
         self.output_dim = output_dim
         self.conv1 = nn.Conv2d(in_channels=3, out_channels=width, kernel_size=patch_size, stride=patch_size, bias=False)
@@ -394,17 +385,8 @@ class VisionTransformer(nn.Module):
             n_ctx = design_details["vision_ctx"]  # hyperparameter
             ctx_vectors = torch.empty(n_ctx, width)
             nn.init.normal_(ctx_vectors, std=0.02)
+            self.VPT = nn.Parameter(ctx_vectors)
             # self.VPT.half()
-            # [SPLE] Init self.VPT
-            if self.sple_mode == "converse":
-                if sple_init:
-                    mixed_vpt = self.ctx_vpt
-                else:
-                    mixed_vpt = self.stack_weight * self.VPT + (1 - self.tack_weight) * self.ctx_vpt
-                self.VPT = nn.Parameter(mixed_vpt)
-            else:
-                self.VPT = nn.Parameter(ctx_vectors)
-
         scale = width ** -0.5
         self.class_embedding = nn.Parameter(scale * torch.randn(width))
         self.positional_embedding = nn.Parameter(scale * torch.randn((input_resolution // patch_size) ** 2 + 1, width))
@@ -418,47 +400,13 @@ class VisionTransformer(nn.Module):
         self.ln_post = LayerNorm(width)
         self.proj = nn.Parameter(scale * torch.randn(width, output_dim))
 
-    # [SPLE] import pre-trained weights (by design_details)
-    def load_promptsrc_prompt_vector(self, design_details):
-        # Load model.pth.tar-[epoch]
-        upper_path = design_details["backbone_path"]
-        ckpt_epoch = design_details["backbone_epoch"]
-        model_path = upper_path + "/VLPromptLearner/model.pth.tar-" + str(ckpt_epoch)  # Path of PromptSRC
-        # Init
-        txt_prompts_depth = design_details["language_depth"]  # Depth of PromptSRC text prompt (DEFAULT: 9)
-        vis_prompts_depth = design_details["vision_depth"]  # Depth of PromptSRC visual prompt (DEFAULT: 9)
-        prompt_learner = torch.load(model_path, map_location="cuda")["state_dict"]  # Load weights
-        txt_prompts_list = []
-        vis_prompts_list = []
-
-        # Extract 0-th text prompt: prompt_learner.ctx
-        ctx_txt = prompt_learner["prompt_learner.ctx"]
-        # Extract 0-th visual prompt: image_encoder.VPT
-        ctx_vpt = prompt_learner["image_encoder.VPT"]
-
-        # Extract a list of text prompts (1-8 Layer)
-        for layer_id in range(1, txt_prompts_depth):
-            txt_prompts_list.append(
-                prompt_learner["text_encoder.transformer.resblocks." + str(layer_id) + ".VPT_shallow"])
-        # Extract a list of visual prompts (1-8 Layer)
-        for layer_id in range(1, vis_prompts_depth):
-            vis_prompts_list.append(
-                prompt_learner["image_encoder.transformer.resblocks." + str(layer_id) + ".VPT_shallow"])
-
-        return ctx_txt, txt_prompts_list, ctx_vpt, vis_prompts_list
-
     def forward(self, x: torch.Tensor):
-        # [SPLE] Return VPT in CONVERSE mode
-        if self.VPT_shallow and self.sple_mode == "converse":
-            self.VPT = nn.Parameter((self.VPT - (1 - self.stack_weight) * self.ctx_vpt)
-                                    * (1 / self.stack_weight)
-                                    )
-
         x = self.conv1(x)  # shape = [*, width, grid, grid]
         x = x.reshape(x.shape[0], x.shape[1], -1)  # shape = [*, width, grid ** 2]
         x = x.permute(0, 2, 1)  # shape = [*, grid ** 2, width]
         x = torch.cat(
-            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype, device=x.device),
+            [self.class_embedding.to(x.dtype) + torch.zeros(x.shape[0], 1, x.shape[-1], dtype=x.dtype,
+                                                            device=x.device),
              x], dim=1)  # shape = [*, grid ** 2 + 1, width]
         x = x + self.positional_embedding.to(x.dtype)
 
@@ -716,7 +664,8 @@ def convert_weights(model: nn.Module):
 
 def build_model(state_dict: dict, design_details):
     vit = "visual.proj" in state_dict
-
+    print(f'build model vit is {vit}')
+    
     if vit:
         vision_width = state_dict["visual.conv1.weight"].shape[0]
         vision_layers = len(
