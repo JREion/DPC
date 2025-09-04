@@ -13,6 +13,8 @@ Arxiv Link: [https://arxiv.org/abs/2503.13443](https://arxiv.org/abs/2503.13443)
 
 - **NOTE**: We are preparing our code repository (mainly rewriting comments to improve readability). We hope to release code in April.
 
+- (3 Sep. 2025) Bug fix. The code of PromptSRC is released.
+
 - (12 Apr. 2025) The code of PromptKD+DPC is released.
 
 - (18 Mar. 2025) Our paper is published on [Arxiv](https://arxiv.org/abs/2503.13443).
