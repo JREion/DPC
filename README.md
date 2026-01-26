@@ -13,6 +13,8 @@ Arxiv Link: [https://arxiv.org/abs/2503.13443](https://arxiv.org/abs/2503.13443)
 
 - **NOTE**: We are preparing our code repository (mainly rewriting comments to improve readability). We hope to release code in April.
 
+- (26 Jan. 2026) The code of CoOp+DPC is released.
+
 - (3 Sep. 2025) Bug fix. The code of PromptSRC is released.
 
 - (12 Apr. 2025) The code of PromptKD+DPC is released.
