@@ -32,7 +32,9 @@ import trainers.promptkd
 import trainers.sple_promptkd  # PromptKD+DPC
 import trainers.promptkd_infer  # Real-time inference head for PromptKD+DPC
 
-# import trainers.coop_stats
+import trainers.coop_stats
+import trainers.sple_coop
+
 # import trainers.promptsrc_stats
 
 
