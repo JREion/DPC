@@ -11,7 +11,7 @@ Arxiv Link: [https://arxiv.org/abs/2503.13443](https://arxiv.org/abs/2503.13443)
 
 ### 🔥 News
 
-- (5 Mar. 2026) Our new research on prompt tuning, **_FVG-PT: Adaptive Foreground View-Guided Prompt Tuning for Vision-Language Models_**, is now available on [Arxiv](https://arxiv.org/abs/2603.08708) and [GitHub](https://github.com/JREion/FVG-PT/blob/main/README.md?plain=1).
+- (5 Mar. 2026) Our new research on prompt tuning, **_FVG-PT: Adaptive Foreground View-Guided Prompt Tuning for Vision-Language Models_**, is now available on [Arxiv](https://arxiv.org/abs/2603.08708) and [GitHub](https://github.com/JREion/FVG-PT).
 
 - (26 Jan. 2026) The code of CoOp+DPC is released.
 
